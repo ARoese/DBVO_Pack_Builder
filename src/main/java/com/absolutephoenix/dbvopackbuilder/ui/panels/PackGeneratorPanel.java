@@ -1,6 +1,9 @@
 package com.absolutephoenix.dbvopackbuilder.ui.panels;
 
 import com.absolutephoenix.dbvopackbuilder.config.ConfigManager;
+import com.absolutephoenix.dbvopackbuilder.generators.ChatterboxDialogueGenerator;
+import com.absolutephoenix.dbvopackbuilder.generators.DialogueGenerator;
+import com.absolutephoenix.dbvopackbuilder.generators.ElevenLabsDialogueGenerator;
 import com.absolutephoenix.dbvopackbuilder.handlers.TopicHandler;
 import com.absolutephoenix.dbvopackbuilder.reference.GlobalVariables;
 import com.absolutephoenix.dbvopackbuilder.ui.MainWindow;
@@ -20,9 +23,13 @@ import java.io.*;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Vector;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public class PackGeneratorPanel extends JPanel implements ComponentListener {
 
@@ -87,6 +94,56 @@ public class PackGeneratorPanel extends JPanel implements ComponentListener {
 
 
     }
+
+    private DialogueGenerator getConfiguredDialogueGenerator(){
+        int selectedGenerator = ConfigManager.getSetting().getSelectedGenerator();
+        if(selectedGenerator == 0){
+            LogHelper.notice("Generating using ElevenLabs");
+            Voice useableVoice = Voice.getVoice(ConfigManager.getSetting().getElevenLabsVoiceID(), true);
+            double stability = (double) ConfigManager.getSetting().getElevenLabsStability() / 100.0d;
+            double similarity = (double) ConfigManager.getSetting().getElevenLabsClarity() / 100.0d;
+            double style = (double) ConfigManager.getSetting().getElevenLabsStyle() / 100.0d;
+            return new ElevenLabsDialogueGenerator(
+                    stability,
+                    similarity,
+                    style,
+                    useableVoice
+            );
+        }else if(selectedGenerator == 1){
+            LogHelper.notice("Generating using Chatterbox");
+            float sf = SettingsPanel.CHATTERBOX_SLIDER_FACTOR;
+            return new ChatterboxDialogueGenerator(
+                   ConfigManager.getSetting().getChatterboxEndpoint(),
+                   Path.of(ConfigManager.getSetting().getChatterboxReference()),
+                   ConfigManager.getSetting().getChatterboxExaggeration()/sf,
+                   ConfigManager.getSetting().getChatterboxCfgWeight()/sf,
+                   ConfigManager.getSetting().getChatterboxTemperature()/sf
+            );
+        }else{
+            throw new IllegalStateException("Unknown generator: " + selectedGenerator);
+        }
+    }
+
+    private boolean processDialogue(DialogueGenerator generator, String voiceString, String fileString, String modName){
+        if(!generator.generateDialogue(voiceString, fileString)){
+            return false;
+        }else {
+            if (ConfigManager.getSetting().getPackGenerateLip().equals("true")) {
+                LipGen.generate(fileString, voiceString);
+            }
+            AudioManipulation.convertWaveToXMW(fileString);
+            AudioManipulation.convertXwmAndLipToFuz(fileString);
+            try {
+                //noinspection BusyWait
+                Thread.sleep(10);
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+            PackBuild.copyFileToPackFolder(fileString, modName);
+        }
+        return true;
+    }
+
     public void actions(){
 
         loadTopicFile.addActionListener(e -> {
@@ -191,38 +248,29 @@ public class PackGeneratorPanel extends JPanel implements ComponentListener {
                             } else {
                                 List<String> voiceStrings = TopicHandler.getVoiceGenStrings(ReadyToProcess);
                                 List<String> fileStrings = TopicHandler.getFileNames(ReadyToProcess);
-                                Voice useableVoice = Voice.getVoice(ConfigManager.getSetting().getElevenLabsVoiceID(), true);
+                                DialogueGenerator generator = getConfiguredDialogueGenerator();
                                 LogHelper.notice("BEGINNING GENERATION OF: " + model.getValueAt(0, 1));
                                 if (voiceStrings.size() == fileStrings.size()) {
-                                    double stability = (double) ConfigManager.getSetting().getElevenLabsStability() / 100.0d;
-                                    double similarity = (double) ConfigManager.getSetting().getElevenLabsClarity() / 100.0d;
-                                    double style = (double) ConfigManager.getSetting().getElevenLabsStyle() / 100.0d;
-
                                     int totalLinesInCurrentMod = voiceStrings.size();
+
                                     for (int x = 0; x < totalLinesInCurrentMod; x++) {
-                                        if(!isBuilding)
+                                        if(!isBuilding) {
                                             break;
-                                        if(!ElevenLabsFileHandling.saveStreamAsMp3(useableVoice, stability, similarity, style, voiceStrings.get(x), fileStrings.get(x))){
+                                        }
+
+                                        var result = processDialogue(
+                                                generator,
+                                                voiceStrings.get(x),
+                                                fileStrings.get(x),
+                                                (String) model.getValueAt(0, 1)
+                                        );
+                                        if(!result){
                                             isBuilding = false;
                                             break;
-                                        }else {
-                                            AudioManipulation.convertMP3ToWAV(fileStrings.get(x));
-                                            if (ConfigManager.getSetting().getPackGenerateLip().equals("true")) {
-                                                LipGen.generate(fileStrings.get(x), voiceStrings.get(x));
-                                            }
-                                            AudioManipulation.convertWaveToXMW(fileStrings.get(x));
-                                            AudioManipulation.convertXwmAndLipToFuz(fileStrings.get(x));
-                                            try {
-                                                //noinspection BusyWait
-                                                Thread.sleep(10);
-                                            } catch (InterruptedException ex) {
-                                                throw new RuntimeException(ex);
-                                            }
-                                            PackBuild.copyFileToPackFolder(fileStrings.get(x), (String) model.getValueAt(0, 1));
-                                            int currentModProgress = (int) (((double) (x + 1) / totalLinesInCurrentMod) * 100);
-                                            int overallProgress = (int) (((double) modsProcessed / totalMods) * 100);
-                                            SwingUtilities.invokeLater(() -> progressLabel.setText("<html>&nbsp;&nbsp;Processing " + currentModName + ": " + currentModProgress + "% complete.<br>&nbsp;&nbsp;Overall: " + overallProgress + "% complete.</html>"));
                                         }
+                                        int currentModProgress = (int) (((double) (x + 1) / totalLinesInCurrentMod) * 100);
+                                        int overallProgress = (int) (((double) modsProcessed / totalMods) * 100);
+                                        SwingUtilities.invokeLater(() -> progressLabel.setText("<html>&nbsp;&nbsp;Processing " + currentModName + ": " + currentModProgress + "% complete.<br>&nbsp;&nbsp;Overall: " + overallProgress + "% complete.</html>"));
                                     }
                                 } else {
                                     LogHelper.error("Unable to continue. Data was processed wrong. Please try again.");

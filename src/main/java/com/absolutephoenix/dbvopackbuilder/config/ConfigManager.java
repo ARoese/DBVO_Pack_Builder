@@ -87,6 +87,26 @@ public class ConfigManager {
     // For each property, the getter method retrieves the value from the properties object, providing a default value if the key is not found.
     // The setter method updates the properties object with the new value for the corresponding key.
 
+    public int getSelectedGenerator() { return Integer.parseInt(properties.getProperty("SelectedGenerator", "0")); }
+    public void setSelectedGenerator(int generator) { properties.setProperty("SelectedGenerator", generator + ""); }
+
+    public String getChatterboxEndpoint() { return properties.getProperty("ChatterboxEndpoint", ""); }
+    public void setChatterboxEndpoint(String endpoint) { properties.setProperty("ChatterboxEndpoint", endpoint); }
+
+    public String getChatterboxReference() { return properties.getProperty("ChatterboxReference", ""); }
+    public void setChatterboxReference(String reference) { properties.setProperty("ChatterboxReference", reference); }
+
+    public int getChatterboxExaggeration() {return Integer.parseInt(properties.getProperty("ChatterboxExaggeration", "50"));}
+    public void setChatterboxExaggeration(int exaggeration) {properties.setProperty("ChatterboxExaggeration", exaggeration + "");}
+
+    // cfg_weight
+    public int getChatterboxCfgWeight() {return Integer.parseInt(properties.getProperty("ChatterboxCfgWeight", "50"));}
+    public void setChatterboxCfgWeight(int cfgWeight) {properties.setProperty("ChatterboxCfgWeight", cfgWeight + "");}
+
+    // temperature
+    public int getChatterboxTemperature() {return Integer.parseInt(properties.getProperty("ChatterboxTemperature", "50"));}
+    public void setChatterboxTemperature(int temperature) {properties.setProperty("ChatterboxTemperature", temperature + "");}
+
     public String getElevenLabsAPIKey() {
         return properties.getProperty("ElevenLabsAPIKey", "");
     }

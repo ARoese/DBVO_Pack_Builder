@@ -27,6 +27,26 @@ import java.util.Objects;
 @SuppressWarnings({"FieldMayBeFinal", "unused", "ExtractMethodRecommender"})
 public class SettingsPanel extends JPanel implements ComponentListener {
 
+    // Generators settings tab pane
+    private JTabbedPane generatorSettingsTabPane = new JTabbedPane();
+
+    // Generator backend selector components
+
+    // Chatterbox settings components
+    private JPanel chatterboxPanel = new JPanel();
+    private JLabel chatterboxEndpointLabel = new JLabel("chatterbox endpoint:");
+    private JTextField chatterboxEndpointField = new JTextField();
+
+    public static float CHATTERBOX_SLIDER_FACTOR = 100f;
+    private JLabel chatterboxExaggerationLabel = new JLabel("Exaggeration:");
+    private JSlider chatterboxExaggeration = new JSlider(0, 200, 50);
+    private JLabel chatterboxCfgWeightLabel = new JLabel("Cfg_weight:");
+    private JSlider chatterboxCfgWeight = new JSlider(0, 100, 50);
+    private JLabel chatterboxTemperatureLabel = new JLabel("Temperature");
+    private JSlider chatterboxTemperature = new JSlider(0, 500, 100);
+    private JLabel chatterboxReferenceLabel = new JLabel("Reference audio file:");
+    private JTextField chatterboxReference = new JTextField();
+
     // ElevenLabs settings components
     private JPanel elevenLabsPanel = new JPanel();
     private JLabel elevenlabsAPILabel = new JLabel("API Key:");
@@ -70,6 +90,7 @@ public class SettingsPanel extends JPanel implements ComponentListener {
     public JButton fomodSave = new JButton("SAVE");
 
     private JScrollPane elevenLabsScrollPane;
+    private JScrollPane chatterboxScrollPane;
     private JScrollPane packScrollPane;
     private JScrollPane fomodScrollPane;
 
@@ -80,9 +101,58 @@ public class SettingsPanel extends JPanel implements ComponentListener {
         this.setLayout(null);
         this.addComponentListener(this);
         elevenLabsSetup();
+        ChatterboxSetup();
+        add(generatorSettingsTabPane);
+        generatorSettingsTabPane.setSelectedIndex(ConfigManager.getSetting().getSelectedGenerator());
         packSetup();
         fomodSetup();
         actions();
+    }
+
+    public void ChatterboxSetup(){
+        // Set layout for the chatterbox settings panel and create a titled border.
+        chatterboxPanel.setLayout(new GridBagLayout());
+
+        // GridBag constraints for component layout.
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.weightx = 1;
+        gbc.weighty = 0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.insets = new Insets(5, 5, 5, 5);
+
+        // Adding components to the panel with constraints for layout.
+        chatterboxPanel.add(chatterboxEndpointLabel, gbc);
+        chatterboxPanel.add(chatterboxEndpointField, gbc);
+        String savedEndpoint = ConfigManager.getSetting().getChatterboxEndpoint();
+        String toPut = savedEndpoint.isBlank() ? "localhost:9000" : savedEndpoint;
+        chatterboxEndpointField.setText(toPut);
+
+        chatterboxPanel.add(chatterboxReferenceLabel, gbc);
+        chatterboxPanel.add(chatterboxReference, gbc);
+        chatterboxReference.setText(ConfigManager.getSetting().getChatterboxReference());
+
+        chatterboxPanel.add(chatterboxExaggerationLabel, gbc);
+        chatterboxPanel.add(chatterboxExaggeration, gbc);
+        chatterboxExaggeration.setValue(ConfigManager.getSetting().getChatterboxExaggeration());
+        chatterboxPanel.add(chatterboxCfgWeightLabel, gbc);
+        chatterboxPanel.add(chatterboxCfgWeight, gbc);
+        chatterboxCfgWeight.setValue(ConfigManager.getSetting().getChatterboxCfgWeight());
+        chatterboxPanel.add(chatterboxTemperatureLabel, gbc);
+        chatterboxPanel.add(chatterboxTemperature, gbc);
+        chatterboxTemperature.setValue(ConfigManager.getSetting().getChatterboxTemperature());
+
+        chatterboxExaggerationLabel.setText("Exaggeration: " + chatterboxExaggeration.getValue()/CHATTERBOX_SLIDER_FACTOR);
+        chatterboxCfgWeightLabel.setText("Cfg Weight: " + chatterboxCfgWeight.getValue()/CHATTERBOX_SLIDER_FACTOR);
+        chatterboxTemperatureLabel.setText("Temperature: " + chatterboxTemperature.getValue()/CHATTERBOX_SLIDER_FACTOR);
+
+        // Add the Chatterbox settings panel to the parent container.
+        chatterboxScrollPane = new JScrollPane(chatterboxPanel);
+        chatterboxScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        chatterboxScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        chatterboxScrollPane.setBorder(BorderFactory.createTitledBorder(BorderFactory.createBevelBorder(0), "Chatterbox Settings"));
+        generatorSettingsTabPane.addTab("Chatterbox", chatterboxScrollPane);
     }
 
     /**
@@ -171,7 +241,7 @@ public class SettingsPanel extends JPanel implements ComponentListener {
         elevenLabsScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         elevenLabsScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         elevenLabsScrollPane.setBorder(BorderFactory.createTitledBorder(BorderFactory.createBevelBorder(0), "ElevenLabs Settings"));
-        add(elevenLabsScrollPane);
+        generatorSettingsTabPane.addTab("ElevenLabs", elevenLabsScrollPane);
         add(elevenlabsSave);
     }
 
@@ -300,39 +370,66 @@ public class SettingsPanel extends JPanel implements ComponentListener {
     }
 
 
+    private void saveElevenLabs(){
+        ConfigManager.getSetting().setElevenLabsAPIKey(new String(elevenLabsAPIField.getPassword()));
+        try {
+            ConfigManager.getSetting().setElevenLabsVoice(Objects.requireNonNull(elevenLabsVoice.getSelectedItem()).toString());
+        }catch (NullPointerException a){
+            ConfigManager.getSetting().setElevenLabsVoice("");
+        }
+        try {
+            ConfigManager.getSetting().setElevenLabsVoiceModel(Objects.requireNonNull(elevenLabsVoiceModel.getSelectedItem()).toString());
+        }catch (NullPointerException a){
+            ConfigManager.getSetting().setElevenLabsVoiceModel("");
+        }
+        for(Voice voice : ElevenLabs.getVoiceAPI().getVoices()) {
+            if(voice.getName().equals(Objects.requireNonNull(elevenLabsVoice.getSelectedItem()).toString()))
+                ConfigManager.getSetting().setElevenLabsVoiceID(voice.getVoiceId());
+        }
+        for(GenerationTypeModel model : ElevenLabs.getModelsAPI().getAvailableModels()) {
+            if(model.getName().equals(Objects.requireNonNull(elevenLabsVoiceModel.getSelectedItem()).toString()))
+                ConfigManager.getSetting().setElevenLabsVoiceModelID(model.getModelId());
+        }
+
+        ConfigManager.getSetting().setElevenLabsStability(elevenlabsStability.getValue());
+        ConfigManager.getSetting().setElevenLabsClarity(elevenlabsClarity.getValue());
+        ConfigManager.getSetting().setElevenLabsStyle(elevenlabsStyle.getValue());
+    }
+
+    private void saveChatterbox(){
+        try {
+            ConfigManager.getSetting().setChatterboxEndpoint(Objects.requireNonNull(chatterboxEndpointField.getText()));
+        }catch (NullPointerException a){
+            ConfigManager.getSetting().setChatterboxEndpoint("");
+        }
+
+        try {
+            ConfigManager.getSetting().setChatterboxReference(Objects.requireNonNull(chatterboxReference.getText()));
+        }catch (NullPointerException a){
+            ConfigManager.getSetting().setChatterboxReference("");
+        }
+
+        ConfigManager.getSetting().setChatterboxExaggeration(chatterboxExaggeration.getValue());
+        ConfigManager.getSetting().setChatterboxCfgWeight(chatterboxCfgWeight.getValue());
+        ConfigManager.getSetting().setChatterboxTemperature(chatterboxTemperature.getValue());
+    }
+
     /**
      * Configures actions for UI components. This method defines and attaches action listeners
      * to the save buttons for each settings section, handling user input and saving settings.
      */
     public void actions(){
         elevenlabsSave.addActionListener(e -> {
-            ConfigManager.getSetting().setElevenLabsAPIKey(new String(elevenLabsAPIField.getPassword()));
-            try {
-                ConfigManager.getSetting().setElevenLabsVoice(Objects.requireNonNull(elevenLabsVoice.getSelectedItem()).toString());
-            }catch (NullPointerException a){
-                ConfigManager.getSetting().setElevenLabsVoice("");
+            int generatorIndex = generatorSettingsTabPane.getSelectedIndex();
+            ConfigManager.getSetting().setSelectedGenerator(generatorIndex);
+            if(generatorIndex == 0){
+                saveElevenLabs();
+            }else if(generatorIndex == 1){
+                saveChatterbox();
             }
-            try {
-                ConfigManager.getSetting().setElevenLabsVoiceModel(Objects.requireNonNull(elevenLabsVoiceModel.getSelectedItem()).toString());
-            }catch (NullPointerException a){
-                ConfigManager.getSetting().setElevenLabsVoiceModel("");
-            }
-            for(Voice voice : ElevenLabs.getVoiceAPI().getVoices()) {
-                if(voice.getName().equals(Objects.requireNonNull(elevenLabsVoice.getSelectedItem()).toString()))
-                    ConfigManager.getSetting().setElevenLabsVoiceID(voice.getVoiceId());
-            }
-
-            for(GenerationTypeModel model : ElevenLabs.getModelsAPI().getAvailableModels()) {
-                if(model.getName().equals(Objects.requireNonNull(elevenLabsVoiceModel.getSelectedItem()).toString()))
-                    ConfigManager.getSetting().setElevenLabsVoiceModelID(model.getModelId());
-            }
-
-            ConfigManager.getSetting().setElevenLabsStability(elevenlabsStability.getValue());
-            ConfigManager.getSetting().setElevenLabsClarity(elevenlabsClarity.getValue());
-            ConfigManager.getSetting().setElevenLabsStyle(elevenlabsStyle.getValue());
 
             ConfigManager.getSetting().saveProperties(false);
-            LogHelper.info("ElevenLabs Settings have been saved.");
+            LogHelper.info("Settings have been saved.");
         });
 
         elevenLabsAPIField.getDocument().addDocumentListener(new DocumentListener() {
@@ -434,13 +531,16 @@ public class SettingsPanel extends JPanel implements ComponentListener {
 
         elevenlabsStyle.addChangeListener(e -> elevenlabsStyleLabel.setText("Voice Emotion (Experimental): " + elevenlabsStyle.getValue()));
 
+        chatterboxExaggeration.addChangeListener(e -> chatterboxExaggerationLabel.setText("Exaggeration: " + chatterboxExaggeration.getValue()/CHATTERBOX_SLIDER_FACTOR));
+        chatterboxCfgWeight.addChangeListener(e -> chatterboxCfgWeightLabel.setText("Cfg Weight: " + chatterboxCfgWeight.getValue()/CHATTERBOX_SLIDER_FACTOR));
+        chatterboxTemperature.addChangeListener(e -> chatterboxTemperatureLabel.setText("Temperature: " + chatterboxTemperature.getValue()/CHATTERBOX_SLIDER_FACTOR));
     }
 
     @Override
     public void componentResized(ComponentEvent e) {
-        elevenLabsScrollPane.setBounds(10, 10, getWidth() / 3 - 20, getHeight() - 60);
-        elevenlabsSave.setBounds(elevenLabsScrollPane.getX(), elevenLabsScrollPane.getY() + elevenLabsScrollPane.getHeight() + 10, elevenLabsScrollPane.getWidth(), 25);
-        packScrollPane.setBounds(elevenLabsScrollPane.getX() + elevenLabsScrollPane.getWidth() + 20, 10, getWidth() / 3 - 20, getHeight() - 60);
+        generatorSettingsTabPane.setBounds(10, 10, getWidth() / 3 - 20, getHeight() - 60);
+        elevenlabsSave.setBounds(generatorSettingsTabPane.getX(), generatorSettingsTabPane.getY() + generatorSettingsTabPane.getHeight() + 10, generatorSettingsTabPane.getWidth(), 25);
+        packScrollPane.setBounds(generatorSettingsTabPane.getX() + generatorSettingsTabPane.getWidth() + 20, 10, getWidth() / 3 - 20, getHeight() - 60);
         PackSave.setBounds(packScrollPane.getX(), packScrollPane.getY() + packScrollPane.getHeight() + 10, packScrollPane.getWidth(), 25);
         fomodScrollPane.setBounds(packScrollPane.getX() + packScrollPane.getWidth() + 20, 10, getWidth() / 3 - 20, getHeight() - 60);
         fomodSave.setBounds(fomodScrollPane.getX(), fomodScrollPane.getY() + fomodScrollPane.getHeight() + 10, fomodScrollPane.getWidth(), 25);

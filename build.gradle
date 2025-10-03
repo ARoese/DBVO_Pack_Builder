@@ -52,8 +52,8 @@ launch4j {
     outfile = 'DBVOPackBuilder.exe'
     jar = shadowJar.archivePath
 
-    //bundledJrePath = "bin/jre"
-    //bundledJre64Bit = true
+    bundledJrePath = "bin/jre"
+    bundledJre64Bit = true
 
     // For additional configuration options, see the Launch4j and plugin documentation
     // Example: icon, vm options, application version, etc.
