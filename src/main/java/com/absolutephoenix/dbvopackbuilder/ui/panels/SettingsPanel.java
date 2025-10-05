@@ -11,9 +11,11 @@ import net.andrewcpu.elevenlabs.model.voice.Voice;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -45,6 +47,7 @@ public class SettingsPanel extends JPanel implements ComponentListener {
     private JLabel chatterboxTemperatureLabel = new JLabel("Temperature");
     private JSlider chatterboxTemperature = new JSlider(0, 500, 100);
     private JLabel chatterboxReferenceLabel = new JLabel("Reference audio file:");
+    private JButton chatterboxReferenceButton = new JButton("Select reference audio file");
     private JTextField chatterboxReference = new JTextField();
 
     // ElevenLabs settings components
@@ -130,6 +133,18 @@ public class SettingsPanel extends JPanel implements ComponentListener {
         chatterboxEndpointField.setText(toPut);
 
         chatterboxPanel.add(chatterboxReferenceLabel, gbc);
+        chatterboxPanel.add(chatterboxReferenceButton, gbc);
+        chatterboxReferenceButton.addActionListener((e) -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setMultiSelectionEnabled(true);
+            fileChooser.setFileFilter(new FileNameExtensionFilter("Wav Files", "wav"));
+
+            int option = fileChooser.showOpenDialog(null);
+            if (option == JFileChooser.APPROVE_OPTION) {
+                File file = fileChooser.getSelectedFile();
+                chatterboxReference.setText(file.getPath());
+            }
+        });
         chatterboxPanel.add(chatterboxReference, gbc);
         chatterboxReference.setText(ConfigManager.getSetting().getChatterboxReference());
 
