@@ -111,52 +111,52 @@ public class LogHelper {
     // Convenience methods for logging at specific levels. Each method calls the private log method with the level and message.
 
     public static void fatal(String message) {
-        log(Level.FATAL, message);
+        log(Level.FATAL, message.replace("%", ""));
     }
 
     public static void error(String message) {
-        log(Level.ERROR, message);
+        log(Level.ERROR, message.replace("%", ""));
     }
 
     public static void warn(String message) {
-        log(Level.WARN, message);
+        log(Level.WARN, message.replace("%", ""));
     }
 
     public static void notice(String message) {
-        log(Level.NOTICE, message);
+        log(Level.NOTICE, message.replace("%", ""));
     }
 
     public static void info(String message) {
-        log(Level.INFO, message);
+        log(Level.INFO, message.replace("%", ""));
     }
 
     public static void redInfo(String message) {
-        log(Level.REDINFO, message);
+        log(Level.REDINFO, message.replace("%", ""));
     }
     public static void greenInfo(String message) {
-        log(Level.GREENINFO, message);
+        log(Level.GREENINFO, message.replace("%", ""));
     }
 
     public static void grayInfo(String message) {
-        log(Level.GRAYINFO, message);
+        log(Level.GRAYINFO, message.replace("%", ""));
     }
     public static void yellowInfo(String message) {
-        log(Level.YELLOWINFO, message);
+        log(Level.YELLOWINFO, message.replace("%", ""));
     }
 
     public static void performance(String message) {
-        log(Level.PERFORMANCE, message);
+        log(Level.PERFORMANCE, message.replace("%", ""));
     }
 
     public static void debug(String message) {
-        log(Level.DEBUG, message);
+        log(Level.DEBUG, message.replace("%", ""));
     }
 
     public static void verbose(String message) {
-        log(Level.VERBOSE, message);
+        log(Level.VERBOSE, message.replace("%", ""));
     }
 
     public static void trace(String message) {
-        log(Level.TRACE, message);
+        log(Level.TRACE, message.replace("%", ""));
     }
 }
