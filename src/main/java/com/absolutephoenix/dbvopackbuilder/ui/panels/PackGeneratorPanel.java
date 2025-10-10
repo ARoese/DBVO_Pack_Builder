@@ -27,9 +27,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Vector;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.*;
 
 public class PackGeneratorPanel extends JPanel implements ComponentListener {
 
@@ -253,25 +251,78 @@ public class PackGeneratorPanel extends JPanel implements ComponentListener {
                                 if (voiceStrings.size() == fileStrings.size()) {
                                     int totalLinesInCurrentMod = voiceStrings.size();
 
-                                    for (int x = 0; x < totalLinesInCurrentMod; x++) {
-                                        if(!isBuilding) {
-                                            break;
-                                        }
+                                    final int concurrencyCount = 4;
+                                    ExecutorService es = Executors.newFixedThreadPool(concurrencyCount);
+                                    CompletionService<Boolean> cs = new ExecutorCompletionService<>(es);
 
-                                        var result = processDialogue(
+                                    // process a single one to make sure directory structure is set up
+                                    if(totalLinesInCurrentMod > 0){
+                                        if(!processDialogue(
                                                 generator,
-                                                voiceStrings.get(x),
-                                                fileStrings.get(x),
+                                                voiceStrings.get(0),
+                                                fileStrings.get(0),
                                                 (String) model.getValueAt(0, 1)
-                                        );
-                                        if(!result){
+                                        )){
                                             isBuilding = false;
-                                            break;
-                                        }
-                                        int currentModProgress = (int) (((double) (x + 1) / totalLinesInCurrentMod) * 100);
-                                        int overallProgress = (int) (((double) modsProcessed / totalMods) * 100);
-                                        SwingUtilities.invokeLater(() -> progressLabel.setText("<html>&nbsp;&nbsp;Processing " + currentModName + ": " + currentModProgress + "% complete.<br>&nbsp;&nbsp;Overall: " + overallProgress + "% complete.</html>"));
+                                        };
                                     }
+
+                                    // pre-populate the cs with enough tasks to keep it saturated
+                                    final String modName = (String) model.getValueAt(0, 1);
+                                    for(int x = 1; x < Math.min(concurrencyCount+1, totalLinesInCurrentMod); x++){
+                                        final int X = x;
+                                        cs.submit(
+                                                () -> processDialogue(
+                                                    generator,
+                                                    voiceStrings.get(X),
+                                                    fileStrings.get(X),
+                                                    modName
+                                                )
+                                        );
+                                    }
+
+                                    try{
+                                        for(int x = 1; x < totalLinesInCurrentMod; x++){
+                                            var wasSuccessful = cs.take().get();
+                                            if(!wasSuccessful){
+                                                isBuilding = false;
+                                            }
+                                            final int nextDialogueIndex = x+concurrencyCount;
+                                            if(!isBuilding){
+                                                break;
+                                            }else if(nextDialogueIndex < totalLinesInCurrentMod){
+                                                // if we have more dialogue to feed in, then do so.
+                                                // this keeps the executorService saturated whilst
+                                                // allowing a fast shutdown after cancellation
+                                                cs.submit(
+                                                        () -> processDialogue(
+                                                                generator,
+                                                                voiceStrings.get(nextDialogueIndex),
+                                                                fileStrings.get(nextDialogueIndex),
+                                                                modName
+                                                        )
+                                                );
+                                            }
+
+
+                                            int currentModProgress = (int) (((double) (x + 1) / totalLinesInCurrentMod) * 100);
+                                            int overallProgress = (int) (((double) modsProcessed / totalMods) * 100);
+                                            SwingUtilities.invokeLater(() -> progressLabel.setText("<html>&nbsp;&nbsp;Processing " + currentModName + ": " + currentModProgress + "% complete.<br>&nbsp;&nbsp;Overall: " + overallProgress + "% complete.</html>"));
+                                        }
+                                    }catch (InterruptedException ie){
+                                        LogHelper.error("Main generator thread interrupted: " + ie.getMessage());
+                                    }catch(ExecutionException ee){
+                                        LogHelper.error("Exception thrown when processing dialogue");
+                                        isBuilding = false;
+                                    } finally{
+                                        es.shutdown();
+                                        try {
+                                            assert es.awaitTermination(Integer.MAX_VALUE, TimeUnit.DAYS);
+                                        }catch (InterruptedException ie){
+                                            LogHelper.error("Main generator thread interrupted: " + ie.getMessage());
+                                        }
+                                    }
+
                                 } else {
                                     LogHelper.error("Unable to continue. Data was processed wrong. Please try again.");
                                 }
